@@ -22,7 +22,8 @@ from .memory import Historico
 
 load_dotenv()
 
-MODELO_PADRAO = "gemini-2.5-flash"
+MODELO_PADRAO = "gemini-3.6-flash"
+FALLBACKS_PADRAO = "gemini-3.5-flash,gemini-3.8-flash"
 MAX_RODADAS_FERRAMENTA = 6
 
 
@@ -46,6 +47,7 @@ class Agente:
             raise RuntimeError("Defina GEMINI_API_KEY no arquivo .env (veja .env.example).")
         self.cliente = genai.Client(api_key=chave)
         self.modelo = modelo or os.getenv("GEMINI_MODEL", MODELO_PADRAO)
+        self.fallbacks = [m.strip() for m in os.getenv("GEMINI_FALLBACK_MODELS", FALLBACKS_PADRAO).split(",") if m.strip()]
         self.historico = historico or Historico(sessao)
         self.ferramentas = [
             types.Tool(function_declarations=[types.FunctionDeclaration(**d) for d in tools.DECLARACOES])
@@ -56,23 +58,31 @@ class Agente:
             system_instruction=prompt.montar(),
             tools=self.ferramentas,
             automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
-            temperature=0.3,
         )
 
     def _gerar(self, conteudos: list[types.Content]) -> types.GenerateContentResponse:
-        # O plano gratuito tem limite baixo de requisições por minuto;
-        # tentamos de novo com espera crescente em 429/5xx.
-        espera = 5
-        for tentativa in range(5):
-            try:
-                return self.cliente.models.generate_content(
-                    model=self.modelo, contents=conteudos, config=self._config()
-                )
-            except (errors.ClientError, errors.ServerError) as exc:
-                if getattr(exc, "code", None) not in (429, 500, 503) or tentativa == 4:
-                    raise
-                time.sleep(espera)
-                espera *= 2
+        # O plano gratuito tem limite baixo de requisições por minuto e os
+        # modelos às vezes ficam sobrecarregados (503). Tentamos de novo com
+        # espera crescente e, se o modelo continuar indisponível, passamos para
+        # o próximo da lista de fallback e ficamos nele pelo resto da sessão.
+        candidatos = [self.modelo] + [m for m in self.fallbacks if m != self.modelo]
+        for i, modelo in enumerate(candidatos):
+            espera = 3
+            for tentativa in range(3):
+                try:
+                    resposta = self.cliente.models.generate_content(
+                        model=modelo, contents=conteudos, config=self._config()
+                    )
+                    self.modelo = modelo
+                    return resposta
+                except (errors.ClientError, errors.ServerError) as exc:
+                    codigo = getattr(exc, "code", None)
+                    if codigo not in (429, 500, 503) or (tentativa == 2 and i == len(candidatos) - 1):
+                        raise
+                    if tentativa == 2:
+                        break
+                    time.sleep(espera)
+                    espera *= 2
         raise RuntimeError("inalcançável")
 
     def responder(self, mensagem: str) -> Resposta:

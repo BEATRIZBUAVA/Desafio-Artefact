@@ -71,27 +71,33 @@ def rodar(nome: str, agora: str, descricao: str, mensagens: list[str], destino: 
     from emporio.memory import Historico
     from emporio.prompt import PERSONA
 
-    with tempfile.TemporaryDirectory() as tmp:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
         historico = Historico(nome, Path(tmp) / "exemplos.db")
         agente = Agente(nome, historico=historico)
-        linhas = [
-            f"# {descricao}",
-            "",
-            f"> Gerado por `scripts/gerar_exemplos.py` com o modelo `{agente.modelo}`. "
-            f"Data/hora simulada: `{agora}`. As linhas `↳` mostram as ferramentas que o agente chamou.",
-            "",
-        ]
-        for msg in mensagens:
-            resposta = agente.responder(msg)
-            linhas += [f"**Cliente:** {msg}", ""]
-            for c in resposta.chamadas:
-                linhas.append(f"> ↳ `{formatar_chamada(c, limite=220)}`")
-            if resposta.chamadas:
-                linhas.append("")
-            linhas += [f"**{PERSONA}:** {resposta.texto}", "", "---", ""]
-            time.sleep(4)  # respeita o limite de requisições do plano gratuito
-        historico.con.close()
-    destino.write_text("\n".join(linhas), encoding="utf-8")
+        modelos_usados = []
+        corpo = []
+        try:
+            for msg in mensagens:
+                resposta = agente.responder(msg)
+                if agente.modelo not in modelos_usados:
+                    modelos_usados.append(agente.modelo)
+                corpo += [f"**Cliente:** {msg}", ""]
+                for c in resposta.chamadas:
+                    corpo.append(f"> ↳ `{formatar_chamada(c, limite=220)}`")
+                if resposta.chamadas:
+                    corpo.append("")
+                corpo += [f"**{PERSONA}:** {resposta.texto}", "", "---", ""]
+                time.sleep(4)  # respeita o limite de requisições do plano gratuito
+        finally:
+            historico.con.close()
+    cabecalho = [
+        f"# {descricao}",
+        "",
+        f"> Gerado por `scripts/gerar_exemplos.py` com o modelo `{', '.join(modelos_usados)}`. "
+        f"Data/hora simulada: `{agora}`. As linhas `↳` mostram as ferramentas que o agente chamou.",
+        "",
+    ]
+    destino.write_text("\n".join(cabecalho + corpo), encoding="utf-8")
     print(f"ok: {destino.relative_to(ROOT)}")
 
 
@@ -102,7 +108,10 @@ def main() -> None:
     saida.mkdir(exist_ok=True)
     for nome in escolhidos:
         agora, descricao, mensagens = CENARIOS[nome]
-        rodar(nome, agora, descricao, mensagens, saida / f"{nome}.md")
+        try:
+            rodar(nome, agora, descricao, mensagens, saida / f"{nome}.md")
+        except Exception as exc:  # um cenário com erro de API não derruba os outros
+            print(f"FALHOU {nome}: {type(exc).__name__}: {str(exc)[:200]}")
 
 
 if __name__ == "__main__":

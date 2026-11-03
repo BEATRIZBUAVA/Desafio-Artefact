@@ -19,6 +19,8 @@ from .data import Store
 
 SOLICITACOES = Path(__file__).resolve().parents[2] / "data" / "solicitacoes.jsonl"
 
+MAX_RESULTADOS = 10
+
 _store: Store | None = None
 
 
@@ -40,8 +42,15 @@ def buscar_produtos(
     incluir_indisponiveis: bool = False,
 ) -> dict:
     s = store()
-    resultados = s.buscar_produtos(termo, categoria, preco_min, preco_max, incluir_indisponiveis)
+    todos = s.buscar_produtos(termo, categoria, preco_min, preco_max, incluir_indisponiveis, limite=1000)
+    resultados = todos[:MAX_RESULTADOS]
     resposta: dict = {"resultados": resultados}
+    if len(todos) > len(resultados):
+        resposta["total_encontrado"] = len(todos)
+        resposta["obs"] = (
+            f"Mostrando os {len(resultados)} mais baratos de {len(todos)}. "
+            "Diga ao cliente que há mais opções e ofereça refinar (faixa de preço, nylon/aço, marca)."
+        )
     if resultados or incluir_indisponiveis:
         return resposta
 

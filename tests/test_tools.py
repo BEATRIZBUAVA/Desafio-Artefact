@@ -98,3 +98,8 @@ def test_descricao_de_outra_marca_e_omitida():
 def test_pedido_enviado_atrasado_gera_alerta():
     p = tools.consultar_pedido(8, "(67) 99654-7821")
     assert p["status"] == "enviado" and "atrasada" in p["alerta"]
+
+
+def test_busca_avisa_quando_ha_mais_resultados():
+    r = tools.buscar_produtos(categoria="Violões", preco_max=1000)
+    assert len(r["resultados"]) == 10 and r["total_encontrado"] == 12
