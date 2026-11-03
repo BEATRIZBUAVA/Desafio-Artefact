@@ -56,8 +56,18 @@ Outros comandos:
 | `python scripts/relatorio_qualidade.py` | Lista as inconsistências encontradas nos CSVs |
 | `python scripts/extrair_politicas.py` | Extrai o texto bruto do PDF de políticas |
 
-Variáveis de ambiente (`.env`): `GEMINI_API_KEY` (obrigatória), `GEMINI_MODEL` (padrão `gemini-2.5-flash`) e
-`EMPORIO_AGORA` (opcional, ex. `2026-11-08T11:20`, fixa a data/hora "atual" para testar horário da loja e prazos).
+Variáveis de ambiente (`.env`):
+
+| Variável | Uso |
+|---|---|
+| `GEMINI_API_KEY` | Obrigatória |
+| `GEMINI_MODEL` | Modelo principal (padrão `gemini-3.6-flash`) |
+| `GEMINI_FALLBACK_MODELS` | Modelos tentados, em ordem, se o principal estiver sem cota ou sobrecarregado |
+| `EMPORIO_AGORA` | Opcional, ex. `2026-11-08T11:20`: fixa a data/hora "atual" para testar horário da loja e prazos |
+
+> **Cota do plano gratuito:** hoje o Gemini gratuito permite cerca de **20 requisições por dia por modelo**,
+> e cada mensagem do cliente gasta de 1 a 3 requisições (ferramentas + resposta). Quando a cota de um modelo
+> acaba, o agente passa sozinho para o próximo da lista de fallback, já que cada modelo tem a sua própria cota.
 
 ## Arquitetura
 
@@ -135,14 +145,20 @@ Alternativas descartadas:
 regras explícitas no prompt. Por exemplo, "nunca informe preço sem consultar" e "para devolução, consulte o
 pedido E a política `trocas_devolucoes`".
 
-### Modelo e provedor: Gemini 2.5 Flash (plano gratuito)
+### Modelo e provedor: Gemini Flash (plano gratuito), com fallback entre modelos
 
 - Gratuito no Google AI Studio, o que deixa o projeto reproduzível pelo avaliador sem custo.
-- Bom em function calling e em português, com latência baixa, o que importa num chat tipo WhatsApp.
-- `temperature=0.3`: respostas consistentes, mas sem soar robótico.
-- O plano gratuito limita requisições por minuto, então o agente tenta de novo com espera crescente em
-  erros 429/5xx.
-- Trocar de modelo é só mudar `GEMINI_MODEL`.
+- A família Flash é boa em function calling e em português, com latência baixa, o que importa num chat tipo
+  WhatsApp.
+- Principal: `gemini-3.6-flash`.
+  - O plano inicial era o `gemini-2.5-flash`, mas a API respondeu que ele não está mais disponível para chaves
+    novas.
+  - O `gemini-3.8-flash` estava com erro 503 (alta demanda) durante o desenvolvimento.
+- Mantive a temperatura padrão, como recomendado para a família Gemini 3.
+- **Resiliência:** no plano gratuito, 429 (cota) e 503 (sobrecarga) foram os erros mais comuns. O agente tenta
+  de novo com espera crescente e, se não der, passa para o próximo modelo de `GEMINI_FALLBACK_MODELS` e fica
+  nele pelo resto da sessão.
+- Trocar de modelo é só mudar `GEMINI_MODEL`. As ferramentas e as regras de negócio não dependem do modelo.
 
 ### Retrieval das políticas: por tópico, sem embeddings
 
@@ -242,7 +258,21 @@ Campo Grande (26/08) e a criação do Estado de MS (11/10).
 ## Exemplos de conversa
 
 Gerados com `scripts/gerar_exemplos.py` contra o modelo real. As mensagens do cliente são roteirizadas e as
-respostas são as que o agente deu, sem edição. Cada arquivo mostra também as ferramentas chamadas.
+respostas são as que o agente deu, sem edição. Cada arquivo mostra também as ferramentas chamadas e o modelo
+usado:
+- os cenários 01 e 02 rodaram no `gemini-3.6-flash`;
+- os cenários 03 a 05 rodaram no `gemini-3.5-flash-lite`, porque a cota diária gratuita dos modelos Flash
+  acabou durante o desenvolvimento.
+
+O fato de o comportamento se manter num modelo menor é um bom sinal de que as regras estão nas ferramentas e
+não dependem do modelo.
+
+Bugs que os exemplos revelaram e que foram corrigidos antes da versão final:
+- a listagem de pedidos não trazia o alerta de atraso;
+- o agente pedia os dados do "amigo" em vez de orientar o titular a entrar em contato;
+- num domingo, o agente não dizia quando a loja reabre.
+
+Ficou um deslize menor no 04: o modelo chamou a data da compra de "data de envio".
 
 | Arquivo | Cenário | O que demonstra |
 |---|---|---|
@@ -254,10 +284,10 @@ respostas são as que o agente deu, sem edição. Cada arquivo mostra também as
 
 ## Testes
 
-`pytest` roda 16 testes offline:
+`pytest` roda 17 testes offline:
 - **Ferramentas:** preço exato, filtro de disponibilidade, esgotado com alternativas, promoção ativa vs.
   expirada, PIX não cumulativo, parcelamento por faixa, verificação de dono do pedido, prazos vencidos,
-  horário/feriados, descrições inconsistentes e alerta de atraso.
+  horário/feriados, descrições inconsistentes, alerta de atraso e aviso quando a busca corta resultados.
 - **Loop do agente com um cliente Gemini falso:** ferramenta → resposta → histórico persistido e retomado;
   fallback para resposta vazia; validade das declarações.
 
@@ -279,8 +309,8 @@ Assim as regras de negócio ficam testadas sem depender do modelo nem gastar cot
   integrar com o sistema de tickets da loja e notificar a equipe.
 - **Identificação do cliente:** é por e-mail ou telefone digitado. No WhatsApp real, o próprio número do
   remetente identificaria o cliente.
-- **Free tier do Gemini:** o limite de requisições por minuto pode causar lentidão em uso intenso. Há
-  retentativa, mas não fila.
+- **Free tier do Gemini:** são cerca de 20 requisições por dia por modelo. O fallback entre modelos
+  ameniza, mas uma sessão longa de testes pode esgotar todos. Em produção, o caminho é o plano pago.
 - **Interface:** só CLI.
 
 **Com mais tempo**
