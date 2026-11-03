@@ -87,3 +87,14 @@ def test_horario_loja():
     assert sabado_tarde["proxima_abertura"].startswith("segunda-feira 09/11")
     finados = clock.situacao_loja(datetime(2026, 11, 2, 10, 0, tzinfo=clock.FUSO))
     assert finados["feriado_hoje"] == "Finados" and finados["aberta_agora"] is False
+
+
+def test_descricao_de_outra_marca_e_omitida():
+    p = tools.detalhes_produto(144)  # "Roland" com descrição de Yamaha
+    assert p["descricao"] is None and "obs_cadastro" in p
+    assert tools.detalhes_produto(95)["descricao"]
+
+
+def test_pedido_enviado_atrasado_gera_alerta():
+    p = tools.consultar_pedido(8, "(67) 99654-7821")
+    assert p["status"] == "enviado" and "atrasada" in p["alerta"]

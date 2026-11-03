@@ -61,6 +61,22 @@ def so_digitos(texto: str) -> str:
     return re.sub(r"\D", "", str(texto))
 
 
+MARCAS = [
+    "Yamaha", "Roland", "Korg", "Nord", "Ibanez", "Fender", "Gibson", "Pearl", "Music Man",
+    "Takamine", "Taylor", "Martin", "Giannini", "Tagima", "Crafter", "Kala", "Ohana", "PRS",
+]
+
+
+def marcas_conflitantes(nome: str, descricao: str) -> tuple[set[str], set[str]] | None:
+    """Detecta descrição que cita outra marca que não a do nome (ex.: produto
+    'Roland Synth 3' com descrição de um Yamaha)."""
+    no_nome = {m for m in MARCAS if m in nome}
+    na_desc = {m for m in MARCAS if m in str(descricao)}
+    if no_nome and na_desc and not no_nome & na_desc:
+        return no_nome, na_desc
+    return None
+
+
 def descrever_pagamento(codigo: str) -> str:
     if codigo.startswith("credit_"):
         return f"cartão de crédito em {codigo.removeprefix('credit_')}"
@@ -154,7 +170,12 @@ class Store:
         else:
             ficha["preco_pix"] = round(preco * 0.95, 2)
         if detalhada:
-            ficha["descricao"] = row["description"]
+            if marcas_conflitantes(row["name"], row["description"]):
+                # Não repassamos ao cliente uma descrição que fala de outro produto.
+                ficha["descricao"] = None
+                ficha["obs_cadastro"] = "descrição do cadastro em revisão; use só nome e especificações"
+            else:
+                ficha["descricao"] = row["description"]
             ficha["especificacoes"] = row["specs"]
         return ficha
 

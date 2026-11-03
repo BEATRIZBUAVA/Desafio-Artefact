@@ -1,0 +1,18 @@
+65 produtos, 20 pedidos, 50 clientes
+
+- Produto 96 (Giannini GF-3D Dreadnought Sunburst) ativo com estoque 0 -> tratado como esgotado
+- Produto 130 (Kala KA-ABP-CTG Barítono Cedar) com status 'coming_soon' e estoque 2 -> não ofertado
+- Produto 136 (Ibanez Bass 2X Electric Bass) com status 'discontinued' e estoque 13 -> não ofertado
+- Produto 93 tem 2 promoções cadastradas (só as ativas valem)
+- Produto 96 tem 2 promoções cadastradas (só as ativas valem)
+- Produto 99 tem 2 promoções cadastradas (só as ativas valem)
+- 4 de 25 promoções estão ativas
+- Pedido 3: total R$ 3450.0 difere da soma dos itens a preço atual (R$ 3498.00) -> exibimos o total registrado
+- Pedido 3 contém o produto 130, hoje com status 'coming_soon'
+- Pedido 14 contém o produto 130, hoje com status 'coming_soon'
+- Pedido 20: total R$ 1400.0 difere da soma dos itens a preço atual (R$ 1488.00) -> exibimos o total registrado
+- Produto 135: nome cita {'Music Man'} mas a descrição cita {'Fender'} -> descrição omitida
+- Produto 137: nome cita {'Yamaha'} mas a descrição cita {'Ibanez'} -> descrição omitida
+- Produto 139: nome cita {'Yamaha'} mas a descrição cita {'Pearl'} -> descrição omitida
+- Produto 142: nome cita {'Korg'} mas a descrição cita {'Roland'} -> descrição omitida
+- Produto 144: nome cita {'Roland'} mas a descrição cita {'Yamaha'} -> descrição omitida

@@ -124,8 +124,13 @@ def consultar_pedido(numero_pedido: int, email_ou_telefone: str) -> dict:
 
     pedido = s.resumo_pedido(numero_pedido)
     pedido["cliente"] = cliente["name"].split()[0]
+    hoje = clock.agora().date()
     if pedido["status_codigo"] == "delivered" and pedido["previsao_entrega"]:
-        pedido["prazos_pos_venda"] = _prazos(pedido, clock.agora().date())
+        pedido["prazos_pos_venda"] = _prazos(pedido, hoje)
+    elif pedido["status_codigo"] == "shipped" and pedido["previsao_entrega"]:
+        atraso = (hoje - date.fromisoformat(pedido["previsao_entrega"])).days
+        if atraso > 0:
+            pedido["alerta"] = f"Entrega atrasada há {atraso} dias em relação à previsão: ofereça abrir um chamado com a equipe."
     return pedido
 
 
