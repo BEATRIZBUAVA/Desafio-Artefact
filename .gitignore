@@ -6,4 +6,3 @@ __pycache__/
 *.db
 data/solicitacoes.jsonl
 *.egg-info/
-.gitattributes_tmp
