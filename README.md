@@ -29,8 +29,8 @@ Pré-requisitos: Python 3.10+ e uma chave **gratuita** da API do Gemini
 ([Google AI Studio → Get API key](https://aistudio.google.com/apikey)).
 
 ```bash
-git clone <este repositório>
-cd emporio-agente
+git clone https://github.com/BEATRIZBUAVA/Desafio-Artefact.git
+cd Desafio-Artefact
 python -m venv .venv
 # Windows: .venv\Scripts\activate    |    Linux/macOS: source .venv/bin/activate
 pip install -e ".[dev]"
