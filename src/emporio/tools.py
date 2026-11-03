@@ -148,12 +148,11 @@ def listar_pedidos_cliente(email_ou_telefone: str) -> dict:
     cliente = s.identificar_cliente(email_ou_telefone)
     if cliente is None:
         return {"erro": "Não encontrei cadastro com esse e-mail/telefone."}
-    pedidos = [s.resumo_pedido(i) for i in s.pedidos_do_cliente(int(cliente["customer_id"]))]
-    resumo = [
-        {k: p[k] for k in ("pedido", "data_compra", "status", "total")} | {"itens": [i["produto"] for i in p["itens"]]}
-        for p in pedidos
-    ]
-    return {"cliente": cliente["name"].split()[0], "pedidos": resumo}
+    # O cliente já foi identificado pelo contato, então devolvemos o detalhe
+    # completo de cada pedido (rastreio, prazos, alerta de atraso).
+    contato = email_ou_telefone
+    pedidos = [consultar_pedido(i, contato) for i in s.pedidos_do_cliente(int(cliente["customer_id"]))]
+    return {"cliente": cliente["name"].split()[0], "pedidos": pedidos}
 
 
 # --------------------------------------------------------------- loja/geral
